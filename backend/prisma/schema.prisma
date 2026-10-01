@@ -1,0 +1,436 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  DIGITAL_MARKETER
+  DESIGNER
+  VIDEO_EDITOR
+}
+
+enum Workload {
+  Low
+  Normal
+  High
+  Overloaded
+}
+
+enum ClientStatus {
+  active
+  paused
+  archived
+}
+
+enum PaymentStatus {
+  paid
+  partial
+  pending
+  overdue
+}
+
+enum ContentType {
+  Video
+  Reel
+  Poster
+  Photo
+  Story
+  Carousel
+  Ad_Creative
+}
+
+enum ContentStatus {
+  Idea
+  Planned
+  Assigned
+  In_Progress
+  Internal_Review
+  Ready
+  Scheduled
+  Published
+  Cancelled
+}
+
+enum Priority {
+  Low
+  Medium
+  High
+  Urgent
+}
+
+enum TaskStatus {
+  Todo
+  In_Progress
+  Review
+  Completed
+  Cancelled
+}
+
+enum DocumentType {
+  Invoice
+  Quotation
+}
+
+enum PaymentMethod {
+  Cash
+  UPI
+  Bank_Transfer
+  Card
+  Other
+}
+
+enum ExpenseCategory {
+  Software
+  Salary
+  Freelancer
+  Advertising
+  Travel
+  Office
+  Equipment
+  Subscription
+  Other
+}
+
+enum MediaFolder {
+  Brand_Assets
+  Photos
+  Videos
+  Posters
+  Reels
+  Documents
+}
+
+model User {
+  id           String       @id @default(uuid())
+  email        String       @unique
+  passwordHash String
+  name         String
+  phone        String
+  role         Role         @default(DIGITAL_MARKETER)
+  avatar       String
+  status       String       @default("active")
+  workload     Workload     @default(Normal)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  deletedAt    DateTime?
+
+  clientsManaged   Client[]      @relation("AccountManager")
+  contentsAssigned ContentItem[]
+  tasksAssigned    Task[]
+  activityLogs     ActivityLog[]
+  refreshTokens    RefreshToken[]
+  notifications    Notification[]
+
+  @@index([role])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Client {
+  id               String        @id @default(uuid())
+  businessName     String
+  contactPerson    String
+  phone            String
+  whatsapp         String
+  email            String
+  address          String
+  industry         String
+  website          String?
+  instagram        String?
+  facebook         String?
+  youtube          String?
+  googleBusiness   String?
+  gstNumber        String?
+  billingName      String
+  billingAddress   String
+  packageId        String
+  package          Package       @relation(fields: [packageId], references: [id])
+  monthlyFee       Float
+  startDate        DateTime
+  endDate          DateTime
+  paymentTerms     String
+  paymentStatus    PaymentStatus @default(pending)
+  status           ClientStatus  @default(active)
+  accountManagerId String
+  accountManager   User          @relation("AccountManager", fields: [accountManagerId], references: [id])
+  notes            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  deletedAt        DateTime?
+
+  monthlyQuotas    MonthlyQuota[]
+  contents         ContentItem[]
+  tasks            Task[]
+  campaigns        Campaign[]
+  invoices         Invoice[]
+  payments         Payment[]
+  mediaItems       MediaItem[]
+
+  @@index([status, paymentStatus])
+  @@index([accountManagerId])
+}
+
+model Package {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  description  String
+  monthlyPrice Float
+  billingCycle String   @default("Monthly")
+  status       String   @default("active")
+  quotaVideos  Int      @default(0)
+  quotaReels   Int      @default(0)
+  quotaPosters Int      @default(0)
+  quotaPhotos  Int      @default(0)
+  quotaStories Int      @default(0)
+  services     String[]
+  isCustom     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  clients      Client[]
+}
+
+model MonthlyQuota {
+  id               String   @id @default(uuid())
+  clientId         String
+  client           Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  month            String
+  monthLabel       String
+  status           String   @default("on_track")
+  notes            String?
+  videosAllocated  Int      @default(0)
+  videosCompleted  Int      @default(0)
+  reelsAllocated   Int      @default(0)
+  reelsCompleted   Int      @default(0)
+  postersAllocated Int      @default(0)
+  postersCompleted Int      @default(0)
+  photosAllocated  Int      @default(0)
+  photosCompleted  Int      @default(0)
+  storiesAllocated Int      @default(0)
+  storiesCompleted Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([clientId, month])
+}
+
+model ContentItem {
+  id             String        @id @default(uuid())
+  clientId       String
+  client         Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaignId     String?
+  campaign       Campaign?     @relation(fields: [campaignId], references: [id])
+  contentType    ContentType
+  title          String
+  description    String
+  platform       String
+  assignedToId   String
+  assignedTo     User          @relation(fields: [assignedToId], references: [id])
+  dueDate        DateTime
+  publishDate    DateTime
+  priority       Priority      @default(High)
+  status         ContentStatus @default(Planned)
+  mediaUrl       String?
+  mediaThumbnail String?
+  caption        String?
+  hashtags       String?
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([clientId, status])
+  @@index([publishDate])
+}
+
+model Task {
+  id             String     @id @default(uuid())
+  title          String
+  description    String
+  clientId       String
+  client         Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  project        String     @default("Social Media Retainer")
+  assignedToId   String
+  assignedTo     User       @relation(fields: [assignedToId], references: [id])
+  priority       Priority   @default(High)
+  status         TaskStatus @default(Todo)
+  dueDate        DateTime
+  estimatedHours Float      @default(1.0)
+  actualHours    Float?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([clientId, status])
+  @@index([assignedToId])
+}
+
+model Campaign {
+  id          String   @id @default(uuid())
+  name        String
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  platform    String
+  objective   String
+  budget      Float
+  spent       Float    @default(0)
+  status      String   @default("Running")
+  startDate   DateTime
+  endDate     DateTime
+  reach       Int      @default(0)
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  leads       Int      @default(0)
+  engagement  Int      @default(0)
+  conversions Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  contentItems ContentItem[]
+
+  @@index([clientId])
+}
+
+model Invoice {
+  id            String       @id @default(uuid())
+  invoiceNumber String       @unique
+  documentType  DocumentType @default(Invoice)
+  clientId      String
+  client        Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  invoiceDate   DateTime
+  dueDate       DateTime
+  subtotal      Float
+  taxRate       Float        @default(0)
+  taxAmount     Float        @default(0)
+  discount      Float        @default(0)
+  total         Float
+  amountPaid    Float        @default(0)
+  balanceDue    Float
+  paymentStatus String       @default("Pending")
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  items    InvoiceItem[]
+  payments Payment[]
+
+  @@index([clientId, paymentStatus])
+  @@index([invoiceNumber])
+}
+
+model InvoiceItem {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Int      @default(1)
+  unitPrice   Float
+  amount      Float
+  createdAt   DateTime @default(now())
+
+  @@index([invoiceId])
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  clientId        String
+  client          Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  invoiceId       String?
+  invoice         Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  amount          Float
+  paymentDate     DateTime
+  paymentMethod   PaymentMethod @default(UPI)
+  referenceNumber String?
+  status          String        @default("Completed")
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([clientId])
+  @@index([invoiceId])
+}
+
+model Expense {
+  id            String          @id @default(uuid())
+  title         String
+  category      ExpenseCategory
+  amount        Float
+  date          DateTime
+  paidBy        String
+  paymentMethod PaymentMethod   @default(Card)
+  receiptName   String?
+  receiptUrl    String?
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([category, date])
+}
+
+model MediaItem {
+  id           String      @id @default(uuid())
+  clientId     String
+  client       Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  folder       MediaFolder @default(Reels)
+  fileName     String
+  fileType     String
+  fileSize     String
+  thumbnailUrl String
+  fileUrl      String
+  uploadedBy   String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([clientId, folder])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   @default("info")
+  read      Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userName  String
+  userRole  String
+  action    String
+  target    String
+  type      String   @default("system")
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model Setting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  category  String   @default("general")
+  updatedAt DateTime @updatedAt
+}
