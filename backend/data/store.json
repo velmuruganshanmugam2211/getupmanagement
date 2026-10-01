@@ -38,6 +38,15 @@
   ],
   "activityLogs": [
     {
+      "id": "act-1790855665686-i29tg",
+      "userName": "Velmurugan S",
+      "userRole": "Super Admin",
+      "action": "User signed in",
+      "target": "Session established",
+      "timestamp": "Just now",
+      "type": "system"
+    },
+    {
       "id": "act-1790853441672-hy4v5",
       "userName": "Velmurugan S",
       "userRole": "Super Admin",
