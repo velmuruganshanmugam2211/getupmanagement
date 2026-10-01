@@ -43,7 +43,8 @@ export const FinancePage: React.FC = () => {
     deleteInvoice,
     deletePayment,
     deleteExpense, 
-    clients 
+    clients,
+    users
   } = useApp();
 
   // Determine initial tab from pathname
@@ -90,6 +91,8 @@ export const FinancePage: React.FC = () => {
   // Search & Filter for Expenses
   const [expenseSearch, setExpenseSearch] = useState('');
   const [expenseCategoryFilter, setExpenseCategoryFilter] = useState('all');
+  const [expenseClientFilter, setExpenseClientFilter] = useState('all');
+  const [expenseMemberFilter, setExpenseMemberFilter] = useState('all');
 
   // Financial Computations according to Cashflow & Retainer Ledger
   const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.total, 0);
@@ -99,6 +102,56 @@ export const FinancePage: React.FC = () => {
   const totalOverdue = overdueInvoices.reduce((sum, inv) => sum + inv.balanceDue, 0);
   const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
   const cashflowProfit = Math.max(0, totalCollected - totalExpenses);
+
+  // Filtered Expenses with Client & Team Member Tagging
+  const filteredExpenses = expenses.filter(e => {
+    const searchLower = expenseSearch.toLowerCase();
+    const matchesSearch = 
+      e.title.toLowerCase().includes(searchLower) || 
+      e.paidBy.toLowerCase().includes(searchLower) ||
+      (e.clientName && e.clientName.toLowerCase().includes(searchLower)) ||
+      (e.teamMemberName && e.teamMemberName.toLowerCase().includes(searchLower));
+    const matchesCat = expenseCategoryFilter === 'all' || e.category === expenseCategoryFilter;
+    const matchesClient = expenseClientFilter === 'all' || e.clientId === expenseClientFilter;
+    const matchesMember = expenseMemberFilter === 'all' || e.teamMemberId === expenseMemberFilter;
+    return matchesSearch && matchesCat && matchesClient && matchesMember;
+  });
+
+  // Client-Level Expense Allocation Breakdown
+  const clientExpenseSummary = clients.map(client => {
+    const clientExps = expenses.filter(e => e.clientId === client.id);
+    const total = clientExps.reduce((s, e) => s + e.amount, 0);
+    const cameraRent = clientExps.filter(e => e.category === 'Equipment' || e.title.toLowerCase().includes('camera')).reduce((s, e) => s + e.amount, 0);
+    const petrolTravel = clientExps.filter(e => e.category === 'Travel' || e.title.toLowerCase().includes('petrol') || e.title.toLowerCase().includes('fuel')).reduce((s, e) => s + e.amount, 0);
+    const editorAmount = clientExps.filter(e => e.category === 'Freelancer' || e.category === 'Salary' || e.title.toLowerCase().includes('editor')).reduce((s, e) => s + e.amount, 0);
+    const otherAmount = Math.max(0, total - (cameraRent + petrolTravel + editorAmount));
+    return {
+      client,
+      total,
+      count: clientExps.length,
+      cameraRent,
+      petrolTravel,
+      editorAmount,
+      otherAmount
+    };
+  }).filter(item => item.total > 0 || item.count > 0);
+
+  // Creator & Team Member Allocation Breakdown (e.g. Video Editor Storage Cards, Fees)
+  const memberExpenseSummary = users.map(user => {
+    const userExps = expenses.filter(e => e.teamMemberId === user.id);
+    const total = userExps.reduce((s, e) => s + e.amount, 0);
+    const storageCards = userExps.filter(e => e.title.toLowerCase().includes('storage') || e.title.toLowerCase().includes('sd card') || e.title.toLowerCase().includes('card') || e.category === 'Equipment').reduce((s, e) => s + e.amount, 0);
+    const salaryOrFee = userExps.filter(e => e.category === 'Salary' || e.category === 'Freelancer' || e.title.toLowerCase().includes('fee') || e.title.toLowerCase().includes('amount') || e.title.toLowerCase().includes('payout')).reduce((s, e) => s + e.amount, 0);
+    const travel = userExps.filter(e => e.category === 'Travel' || e.title.toLowerCase().includes('petrol')).reduce((s, e) => s + e.amount, 0);
+    return {
+      user,
+      total,
+      count: userExps.length,
+      storageCards,
+      salaryOrFee,
+      travel
+    };
+  }).filter(item => item.total > 0 || item.count > 0);
 
   const tabs = [
     { id: 'overview', label: 'Financial Overview' },
@@ -124,13 +177,6 @@ export const FinancePage: React.FC = () => {
     return p.clientName.toLowerCase().includes(paymentSearch.toLowerCase()) ||
       p.invoiceNumber.toLowerCase().includes(paymentSearch.toLowerCase()) ||
       (p.referenceNumber && p.referenceNumber.toLowerCase().includes(paymentSearch.toLowerCase()));
-  });
-
-  // Filtered Expenses
-  const filteredExpenses = expenses.filter(e => {
-    const matchesSearch = e.title.toLowerCase().includes(expenseSearch.toLowerCase()) || e.paidBy.toLowerCase().includes(expenseSearch.toLowerCase());
-    const matchesCat = expenseCategoryFilter === 'all' || e.category === expenseCategoryFilter;
-    return matchesSearch && matchesCat;
   });
 
   const openRecordPaymentForInvoice = (invId: string) => {
@@ -335,6 +381,127 @@ export const FinancePage: React.FC = () => {
               Manage All Expenses
             </Button>
           </Card>
+
+          {/* Client & Creator Expense Allocation Analytics Section */}
+          <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+            {/* 1. Client Cost Allocations (Camera Rent, Petrol, Video Editor) */}
+            <Card className="p-5 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0] dark:border-[#1E293B]">
+                <div>
+                  <h3 className="text-sm font-bold text-[#0F172A] dark:text-[#F8FAFC]">
+                    Client Cost Breakdown (Camera Rent, Petrol, Editors)
+                  </h3>
+                  <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+                    Specific expenditures incurred and tagged to individual client accounts.
+                  </p>
+                </div>
+                <Badge variant="brand">{clientExpenseSummary.length} Clients Tagged</Badge>
+              </div>
+
+              {clientExpenseSummary.length === 0 ? (
+                <div className="p-6 text-center text-xs text-[#64748B] dark:text-[#94A3B8] italic">
+                  No client-specific expenses recorded yet. Use "Log Expense" to tag expenses to clients.
+                </div>
+              ) : (
+                <div className="overflow-x-auto -mx-5 -mb-5">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#F8FAFC] dark:bg-[#0B1120] border-y border-[#E2E8F0] dark:border-[#1E293B] text-[#475569] dark:text-[#94A3B8] font-semibold">
+                      <tr>
+                        <th className="p-3 pl-5">Client Name</th>
+                        <th className="p-3 text-right">📸 Camera Rent</th>
+                        <th className="p-3 text-right">⛽ Petrol/Fuel</th>
+                        <th className="p-3 text-right">🎬 Editor Cost</th>
+                        <th className="p-3 text-right pr-5">Total Spent</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E2E8F0] dark:divide-[#1E293B]">
+                      {clientExpenseSummary.map(({ client, total, cameraRent, petrolTravel, editorAmount }) => (
+                        <tr key={client.id} className="hover:bg-[#F8FAFC] dark:hover:bg-[#111827]/60 transition-colors">
+                          <td className="p-3 pl-5 font-bold text-[#0F172A] dark:text-[#F8FAFC]">
+                            {client.businessName}
+                          </td>
+                          <td className="p-3 text-right font-medium text-[#64748B] dark:text-[#94A3B8]">
+                            {cameraRent > 0 ? `₹${cameraRent.toLocaleString()}` : '—'}
+                          </td>
+                          <td className="p-3 text-right font-medium text-[#64748B] dark:text-[#94A3B8]">
+                            {petrolTravel > 0 ? `₹${petrolTravel.toLocaleString()}` : '—'}
+                          </td>
+                          <td className="p-3 text-right font-medium text-[#64748B] dark:text-[#94A3B8]">
+                            {editorAmount > 0 ? `₹${editorAmount.toLocaleString()}` : '—'}
+                          </td>
+                          <td className="p-3 text-right pr-5 font-bold text-[#DC2626] dark:text-[#F87171]">
+                            ₹{total.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+
+            {/* 2. Creator & Team Member Allocation (Storage Cards, Video Editor Payouts) */}
+            <Card className="p-5 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0] dark:border-[#1E293B]">
+                <div>
+                  <h3 className="text-sm font-bold text-[#0F172A] dark:text-[#F8FAFC]">
+                    Creator & Video Editor Expenditure
+                  </h3>
+                  <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+                    Storage cards, hard drives, freelancer editor payouts, and commute allowances.
+                  </p>
+                </div>
+                <Badge variant="neutral">{memberExpenseSummary.length} Members Tagged</Badge>
+              </div>
+
+              {memberExpenseSummary.length === 0 ? (
+                <div className="p-6 text-center text-xs text-[#64748B] dark:text-[#94A3B8] italic">
+                  No member-specific expenses tagged yet. Tag video editors when logging expenses.
+                </div>
+              ) : (
+                <div className="overflow-x-auto -mx-5 -mb-5">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#F8FAFC] dark:bg-[#0B1120] border-y border-[#E2E8F0] dark:border-[#1E293B] text-[#475569] dark:text-[#94A3B8] font-semibold">
+                      <tr>
+                        <th className="p-3 pl-5">Team Member / Creator</th>
+                        <th className="p-3 text-right">💾 SD / Storage</th>
+                        <th className="p-3 text-right">💼 Payout / Fees</th>
+                        <th className="p-3 text-right">🚗 Commute</th>
+                        <th className="p-3 text-right pr-5">Total Tagged</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E2E8F0] dark:divide-[#1E293B]">
+                      {memberExpenseSummary.map(({ user, total, storageCards, salaryOrFee, travel }) => (
+                        <tr key={user.id} className="hover:bg-[#F8FAFC] dark:hover:bg-[#111827]/60 transition-colors">
+                          <td className="p-3 pl-5">
+                            <div className="flex items-center gap-2">
+                              <img src={user.avatar} alt={user.name} className="w-6 h-6 rounded-full object-cover" />
+                              <div>
+                                <p className="font-bold text-[#0F172A] dark:text-[#F8FAFC]">{user.name}</p>
+                                <span className="text-[10px] text-[#64748B] dark:text-[#94A3B8]">{user.role}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-3 text-right font-medium text-[#64748B] dark:text-[#94A3B8]">
+                            {storageCards > 0 ? `₹${storageCards.toLocaleString()}` : '—'}
+                          </td>
+                          <td className="p-3 text-right font-medium text-[#64748B] dark:text-[#94A3B8]">
+                            {salaryOrFee > 0 ? `₹${salaryOrFee.toLocaleString()}` : '—'}
+                          </td>
+                          <td className="p-3 text-right font-medium text-[#64748B] dark:text-[#94A3B8]">
+                            {travel > 0 ? `₹${travel.toLocaleString()}` : '—'}
+                          </td>
+                          <td className="p-3 text-right pr-5 font-bold text-[#DC2626] dark:text-[#F87171]">
+                            ₹{total.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
         </div>
       )}
 
@@ -623,28 +790,51 @@ export const FinancePage: React.FC = () => {
             </Button>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
               <SearchInput
                 value={expenseSearch}
                 onChange={e => setExpenseSearch(e.target.value)}
                 onClear={() => setExpenseSearch('')}
-                placeholder="Search expense title or spender..."
+                placeholder="Search title, spender, or tag..."
               />
             </div>
-            <div className="w-48">
+            <div>
               <Select
                 value={expenseCategoryFilter}
                 onChange={e => setExpenseCategoryFilter(e.target.value)}
               >
                 <option value="all">All Categories</option>
+                <option value="Equipment">Equipment & Cameras</option>
+                <option value="Travel">Travel & Petrol</option>
+                <option value="Freelancer">Freelance & Creators</option>
+                <option value="Salary">Salary & Team</option>
                 <option value="Software">Software</option>
-                <option value="Salary">Salary</option>
-                <option value="Freelancer">Freelancer</option>
                 <option value="Advertising">Advertising</option>
                 <option value="Office">Office</option>
-                <option value="Travel">Travel</option>
                 <option value="Other">Other</option>
+              </Select>
+            </div>
+            <div>
+              <Select
+                value={expenseClientFilter}
+                onChange={e => setExpenseClientFilter(e.target.value)}
+              >
+                <option value="all">All Clients</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>{c.businessName}</option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <Select
+                value={expenseMemberFilter}
+                onChange={e => setExpenseMemberFilter(e.target.value)}
+              >
+                <option value="all">All Team Members</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                ))}
               </Select>
             </div>
           </div>
@@ -652,8 +842,8 @@ export const FinancePage: React.FC = () => {
           {filteredExpenses.length === 0 ? (
             <div className="p-12 text-center text-[#64748B] dark:text-[#94A3B8] text-xs">
               <DollarSign className="w-8 h-8 text-[#94A3B8] mx-auto mb-2" />
-              <p className="font-semibold text-[#0F172A] dark:text-[#F8FAFC]">No expenditure vouchers logged</p>
-              <p className="text-[11px] mt-1">Click "Log Expense" above to record agency costs.</p>
+              <p className="font-semibold text-[#0F172A] dark:text-[#F8FAFC]">No expenditure vouchers match the filter</p>
+              <p className="text-[11px] mt-1">Try clearing your filters or click "Log Expense" above.</p>
             </div>
           ) : (
             <div className="overflow-x-auto -mx-4 -mb-4">
@@ -663,6 +853,8 @@ export const FinancePage: React.FC = () => {
                     <th className="p-3.5 pl-4">Expense Title</th>
                     <th className="p-3.5">Category</th>
                     <th className="p-3.5">Amount</th>
+                    <th className="p-3.5">Client Tag</th>
+                    <th className="p-3.5">Tagged Creator</th>
                     <th className="p-3.5">Date</th>
                     <th className="p-3.5">Paid By</th>
                     <th className="p-3.5">Method</th>
@@ -680,7 +872,25 @@ export const FinancePage: React.FC = () => {
                       <td className="p-3.5 font-bold text-[#DC2626] dark:text-[#F87171]">
                         ₹{e.amount.toLocaleString()}
                       </td>
-                      <td className="p-3.5">{e.date}</td>
+                      <td className="p-3.5">
+                        {e.clientName ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-[#EFF6FF] dark:bg-[#1E3A8A]/40 text-[#2563EB] dark:text-[#60A5FA] border border-[#BFDBFE] dark:border-[#1E40AF]">
+                            {e.clientName}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-[#94A3B8] italic">— General</span>
+                        )}
+                      </td>
+                      <td className="p-3.5">
+                        {e.teamMemberName ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-[#F0FDF4] dark:bg-[#14532D]/40 text-[#008000] dark:text-[#4ADE80] border border-[#BBF7D0] dark:border-[#166534]">
+                            {e.teamMemberName}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-[#94A3B8]">—</span>
+                        )}
+                      </td>
+                      <td className="p-3.5 text-[#64748B] dark:text-[#94A3B8]">{e.date}</td>
                       <td className="p-3.5 font-medium">{e.paidBy}</td>
                       <td className="p-3.5">{e.paymentMethod}</td>
                       <td className="p-3.5 text-[11px] text-[#008000]">{e.receiptName || '—'}</td>

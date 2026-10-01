@@ -28,10 +28,11 @@ export const ContentPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const typeParam = searchParams.get('type');
 
-  const { contents, clients, users, updateContentStatus, deleteContent } = useApp();
+  const { contents, clients, users, currentUser, updateContentStatus, deleteContent } = useApp();
 
   const [search, setSearch] = useState('');
   const [clientFilter, setClientFilter] = useState('all');
+  const [assigneeFilter, setAssigneeFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState(typeParam || 'all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [platformFilter, setPlatformFilter] = useState('all');
@@ -56,12 +57,15 @@ export const ContentPage: React.FC = () => {
       c.assignedToName.toLowerCase().includes(search.toLowerCase());
 
     const matchesClient = clientFilter === 'all' || c.clientId === clientFilter;
+    const matchesAssignee = assigneeFilter === 'all' || c.assignedToId === assigneeFilter;
     const matchesType = typeFilter === 'all' || c.contentType === typeFilter;
     const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
     const matchesPlatform = platformFilter === 'all' || c.platform === platformFilter;
 
-    return matchesSearch && matchesClient && matchesType && matchesStatus && matchesPlatform;
+    return matchesSearch && matchesClient && matchesAssignee && matchesType && matchesStatus && matchesPlatform;
   });
+
+  const myAssignedCount = contents.filter(c => c.assignedToId === currentUser.id).length;
 
   const statuses: ContentStatus[] = [
     'Idea', 'Planned', 'Assigned', 'In Progress', 'Internal Review', 'Ready', 'Scheduled', 'Published', 'Cancelled'
@@ -117,7 +121,7 @@ export const ContentPage: React.FC = () => {
 
       {/* Filter Toolbar */}
       <Card className="p-4 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
           <div className="md:col-span-2">
             <SearchInput
               value={search}
@@ -134,6 +138,16 @@ export const ContentPage: React.FC = () => {
             <option value="all">All Clients</option>
             {clients.map(c => (
               <option key={c.id} value={c.id}>{c.businessName}</option>
+            ))}
+          </Select>
+
+          <Select
+            value={assigneeFilter}
+            onChange={e => setAssigneeFilter(e.target.value)}
+          >
+            <option value="all">All Assignees</option>
+            {users.map(u => (
+              <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
             ))}
           </Select>
 
@@ -167,13 +181,28 @@ export const ContentPage: React.FC = () => {
           </Select>
         </div>
 
-        <div className="flex items-center justify-between text-xs text-[#64748B] dark:text-[#94A3B8] pt-1">
-          <span>Showing <strong className="text-[#0F172A] dark:text-[#F8FAFC]">{filteredContents.length}</strong> items</span>
-          {(search || clientFilter !== 'all' || typeFilter !== 'all' || statusFilter !== 'all') && (
+        <div className="flex flex-wrap items-center justify-between text-xs text-[#64748B] dark:text-[#94A3B8] pt-1 gap-2">
+          <div className="flex items-center gap-2">
+            <span>Showing <strong className="text-[#0F172A] dark:text-[#F8FAFC]">{filteredContents.length}</strong> items</span>
+            <span className="text-[#CBD5E1]">|</span>
+            <button
+              onClick={() => setAssigneeFilter(assigneeFilter === currentUser.id ? 'all' : currentUser.id)}
+              className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
+                assigneeFilter === currentUser.id 
+                  ? 'bg-[#008000] text-white' 
+                  : 'bg-[#F1F5F9] dark:bg-[#1E293B] text-[#475569] dark:text-[#94A3B8] hover:text-[#008000]'
+              }`}
+            >
+              🎬 My Assigned Work ({myAssignedCount})
+            </button>
+          </div>
+
+          {(search || clientFilter !== 'all' || assigneeFilter !== 'all' || typeFilter !== 'all' || statusFilter !== 'all') && (
             <button
               onClick={() => {
                 setSearch('');
                 setClientFilter('all');
+                setAssigneeFilter('all');
                 setTypeFilter('all');
                 setStatusFilter('all');
                 searchParams.delete('type');

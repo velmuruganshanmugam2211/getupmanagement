@@ -48,7 +48,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     isDark, 
     toggleDarkMode,
     showToast,
-    logout
+    logout,
+    users,
+    switchToUser
   } = useApp();
 
   const location = useLocation();
@@ -247,23 +249,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Role Switcher & User Profile Bottom */}
       <div className="p-3 border-t border-[#E2E8F0] dark:border-[#1E293B] shrink-0 bg-[#F8FAFC]/70 dark:bg-[#0B1120]">
-        {!collapsed && (
+        {!collapsed && (currentUser.role === 'Super Admin' || currentUser.role === 'Admin') && (
           <div className="mb-3 space-y-1.5">
             <div className="flex items-center justify-between text-[11px] text-[#64748B] dark:text-[#94A3B8]">
-              <span className="font-semibold uppercase tracking-wider">Role Preview</span>
+              <span className="font-semibold uppercase tracking-wider">Switch Team User</span>
               <Sparkles className="w-3 h-3 text-[#008000]" />
             </div>
             <select
-              value={currentRole}
+              value={currentUser.id}
               onChange={(e) => {
-                const newRole = e.target.value as UserRole;
-                setCurrentRole(newRole);
-                showToast('Role Switched', `Now viewing as ${newRole}`);
+                switchToUser(e.target.value);
               }}
               className="w-full text-xs font-medium py-1.5 px-2 rounded-lg bg-white dark:bg-[#1E293B] border border-[#CBD5E1] dark:border-[#334155] text-[#0F172A] dark:text-[#F8FAFC] focus:outline-none focus:border-[#008000]"
             >
-              {roles.map(r => (
-                <option key={r} value={r}>{r}</option>
+              {users.map(u => (
+                <option key={u.id} value={u.id}>{u.name} — {u.role}</option>
               ))}
             </select>
           </div>

@@ -23,7 +23,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { Task, TaskStatus } from '../../types';
 
 export const TasksPage: React.FC = () => {
-  const { tasks, clients, users, updateTaskStatus, deleteTask } = useApp();
+  const { tasks, clients, users, currentUser, updateTaskStatus, deleteTask } = useApp();
 
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [search, setSearch] = useState('');
@@ -141,10 +141,24 @@ export const TasksPage: React.FC = () => {
           </Select>
         </div>
 
-        <div className="flex items-center justify-between text-xs text-[#64748B] dark:text-[#94A3B8] pt-1">
-          <span>
-            Showing <strong className="text-[#0F172A] dark:text-[#F8FAFC]">{filteredTasks.length}</strong> of {tasks.length} tasks
-          </span>
+        <div className="flex flex-wrap items-center justify-between text-xs text-[#64748B] dark:text-[#94A3B8] pt-1 gap-2">
+          <div className="flex items-center gap-2">
+            <span>
+              Showing <strong className="text-[#0F172A] dark:text-[#F8FAFC]">{filteredTasks.length}</strong> of {tasks.length} tasks
+            </span>
+            <span className="text-[#CBD5E1]">|</span>
+            <button
+              onClick={() => setAssigneeFilter(assigneeFilter === currentUser.id ? 'all' : currentUser.id)}
+              className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
+                assigneeFilter === currentUser.id 
+                  ? 'bg-[#008000] text-white' 
+                  : 'bg-[#F1F5F9] dark:bg-[#1E293B] text-[#475569] dark:text-[#94A3B8] hover:text-[#008000]'
+              }`}
+            >
+              📋 My Assigned Tasks ({tasks.filter(t => t.assignedToId === currentUser.id).length})
+            </button>
+          </div>
+
           {(search || clientFilter !== 'all' || assigneeFilter !== 'all' || priorityFilter !== 'all') && (
             <button
               onClick={() => {

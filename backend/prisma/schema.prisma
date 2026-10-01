@@ -365,20 +365,26 @@ model Payment {
 }
 
 model Expense {
-  id            String          @id @default(uuid())
-  title         String
-  category      ExpenseCategory
-  amount        Float
-  date          DateTime
-  paidBy        String
-  paymentMethod PaymentMethod   @default(Card)
-  receiptName   String?
-  receiptUrl    String?
-  notes         String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id             String          @id @default(uuid())
+  title          String
+  category       ExpenseCategory
+  amount         Float
+  date           DateTime
+  paidBy         String
+  paymentMethod  PaymentMethod   @default(Card)
+  clientId       String?
+  clientName     String?
+  teamMemberId   String?
+  teamMemberName String?
+  receiptName    String?
+  receiptUrl     String?
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   @@index([category, date])
+  @@index([clientId])
+  @@index([teamMemberId])
 }
 
 model MediaItem {

@@ -40,7 +40,7 @@ const AVATAR_PRESETS = [
 ];
 
 export const TeamPage: React.FC = () => {
-  const { users, tasks, contents, addUser, updateUser, deleteUser } = useApp();
+  const { users, tasks, contents, addUser, updateUser, deleteUser, customRoles } = useApp();
 
   // Search & Filter
   const [search, setSearch] = useState('');
@@ -230,6 +230,9 @@ export const TeamPage: React.FC = () => {
             <option value="Digital Marketer">Digital Marketer</option>
             <option value="Designer">Designer</option>
             <option value="Video Editor">Video Editor</option>
+            {customRoles.map(cr => (
+              <option key={cr} value={cr}>{cr}</option>
+            ))}
           </Select>
         </div>
         <div className="w-44">
@@ -513,6 +516,9 @@ export const TeamPage: React.FC = () => {
               <option value="Designer">Designer</option>
               <option value="Admin">Admin</option>
               <option value="Super Admin">Super Admin</option>
+              {customRoles.map(cr => (
+                <option key={cr} value={cr}>{cr}</option>
+              ))}
             </Select>
 
             <Select
@@ -656,6 +662,9 @@ export const TeamPage: React.FC = () => {
                 <option value="Digital Marketer">Digital Marketer</option>
                 <option value="Designer">Designer</option>
                 <option value="Video Editor">Video Editor</option>
+                {customRoles.map(cr => (
+                  <option key={cr} value={cr}>{cr}</option>
+                ))}
               </Select>
 
               <Select

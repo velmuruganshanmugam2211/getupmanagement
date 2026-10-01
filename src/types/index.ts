@@ -3,7 +3,24 @@ export type UserRole =
   | 'Admin' 
   | 'Digital Marketer' 
   | 'Designer' 
-  | 'Video Editor';
+  | 'Video Editor'
+  | (string & {});
+
+export type AppModule = 
+  | 'dashboard'
+  | 'clients' 
+  | 'packages' 
+  | 'content' 
+  | 'calendar' 
+  | 'tasks' 
+  | 'campaigns' 
+  | 'finance' 
+  | 'media' 
+  | 'team' 
+  | 'reports' 
+  | 'settings';
+
+export type RolePermissionsMap = Record<string, AppModule[]>;
 
 export interface User {
   id: string;
@@ -263,6 +280,10 @@ export interface Expense {
   date: string;
   paidBy: string;
   paymentMethod: PaymentMethod;
+  clientId?: string;
+  clientName?: string;
+  teamMemberId?: string;
+  teamMemberName?: string;
   receiptName?: string;
   notes?: string;
 }

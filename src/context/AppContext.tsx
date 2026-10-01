@@ -6,16 +6,18 @@ import {
   Package, 
   MonthlyQuota, 
   ContentItem, 
-  ContentStatus,
+  ContentStatus, 
   Task, 
-  TaskStatus,
+  TaskStatus, 
   Campaign, 
   Invoice, 
   Payment, 
   Expense, 
   MediaItem, 
   ActivityLog, 
-  Notification 
+  Notification, 
+  AppModule, 
+  RolePermissionsMap 
 } from '../types';
 import { 
   INITIAL_USERS, 
@@ -147,8 +149,14 @@ interface AppContextType {
   showToast: (title: string, message?: string, type?: ToastMessage['type']) => void;
   dismissToast: (id: string) => void;
 
-  // Permissions
-  hasAccess: (module: 'clients' | 'packages' | 'content' | 'calendar' | 'tasks' | 'campaigns' | 'finance' | 'media' | 'team' | 'reports' | 'settings') => boolean;
+  // Permissions & Custom Roles
+  hasAccess: (module: AppModule) => boolean;
+  switchToUser: (userId: string) => void;
+  customRoles: string[];
+  rolePermissions: RolePermissionsMap;
+  updateRolePermission: (role: string, module: AppModule, allowed: boolean) => void;
+  createCustomRole: (roleName: string, initialPermissions: AppModule[]) => void;
+  deleteCustomRole: (roleName: string) => void;
 
   // Clear data
   clearAllData: () => void;
@@ -411,6 +419,67 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Default permissions mapping matching RBAC Matrix
+  const DEFAULT_ROLE_PERMISSIONS: RolePermissionsMap = {
+    'Super Admin': ['dashboard', 'clients', 'packages', 'content', 'calendar', 'tasks', 'campaigns', 'finance', 'media', 'team', 'reports', 'settings'],
+    'Admin': ['dashboard', 'clients', 'packages', 'content', 'calendar', 'tasks', 'campaigns', 'finance', 'media', 'team', 'reports', 'settings'],
+    'Digital Marketer': ['dashboard', 'clients', 'content', 'calendar', 'tasks', 'campaigns', 'media', 'reports'],
+    'Designer': ['dashboard', 'content', 'calendar', 'tasks', 'media'],
+    'Video Editor': ['dashboard', 'content', 'calendar', 'tasks', 'media']
+  };
+
+  const [rolePermissions, setRolePermissions] = useState<RolePermissionsMap>(() => {
+    const saved = localStorage.getItem('getup_role_permissions');
+    return saved ? JSON.parse(saved) : DEFAULT_ROLE_PERMISSIONS;
+  });
+
+  const [customRoles, setCustomRoles] = useState<string[]>(() => {
+    const saved = localStorage.getItem('getup_custom_roles');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const updateRolePermission = (role: string, module: AppModule, allowed: boolean) => {
+    setRolePermissions(prev => {
+      const currentList = prev[role] || [];
+      const updatedList = allowed 
+        ? Array.from(new Set([...currentList, module]))
+        : currentList.filter(m => m !== module);
+      const nextMap = { ...prev, [role]: updatedList };
+      localStorage.setItem('getup_role_permissions', JSON.stringify(nextMap));
+      return nextMap;
+    });
+    showToast('Permission Updated', `${role} access to ${module} ${allowed ? 'granted' : 'revoked'}.`);
+  };
+
+  const createCustomRole = (roleName: string, initialPermissions: AppModule[]) => {
+    const trimmed = roleName.trim();
+    if (!trimmed) return;
+    if (!customRoles.includes(trimmed)) {
+      const updatedCustom = [...customRoles, trimmed];
+      setCustomRoles(updatedCustom);
+      localStorage.setItem('getup_custom_roles', JSON.stringify(updatedCustom));
+    }
+    setRolePermissions(prev => {
+      const nextMap = { ...prev, [trimmed]: initialPermissions };
+      localStorage.setItem('getup_role_permissions', JSON.stringify(nextMap));
+      return nextMap;
+    });
+    showToast('Role Created', `New role "${trimmed}" configured with selected permissions.`);
+  };
+
+  const deleteCustomRole = (roleName: string) => {
+    const updatedCustom = customRoles.filter(r => r !== roleName);
+    setCustomRoles(updatedCustom);
+    localStorage.setItem('getup_custom_roles', JSON.stringify(updatedCustom));
+    setRolePermissions(prev => {
+      const nextMap = { ...prev };
+      delete nextMap[roleName];
+      localStorage.setItem('getup_role_permissions', JSON.stringify(nextMap));
+      return nextMap;
+    });
+    showToast('Role Removed', `Custom role "${roleName}" has been removed.`);
+  };
+
   // Role Switcher for preview
   const handleRoleChange = (role: UserRole) => {
     setCurrentRole(role);
@@ -420,18 +489,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Permission Checker
-  const hasAccess = (module: 'clients' | 'packages' | 'content' | 'calendar' | 'tasks' | 'campaigns' | 'finance' | 'media' | 'team' | 'reports' | 'settings'): boolean => {
+  // Direct switch to any team member user
+  const switchToUser = (userId: string) => {
+    const target = users.find(u => u.id === userId);
+    if (target) {
+      setCurrentUser(target);
+      setCurrentRole(target.role);
+      showToast('Switched User', `Now operating as ${target.name} (${target.role})`);
+    }
+  };
+
+  // Dynamic Permission Checker
+  const hasAccess = (module: AppModule): boolean => {
     if (currentRole === 'Super Admin') return true;
-    if (currentRole === 'Admin') return true;
-    if (currentRole === 'Digital Marketer') {
-      return ['clients', 'content', 'calendar', 'tasks', 'campaigns', 'reports', 'media'].includes(module);
-    }
-    if (currentRole === 'Designer') {
-      return ['content', 'calendar', 'tasks', 'media'].includes(module);
-    }
-    if (currentRole === 'Video Editor') {
-      return ['content', 'calendar', 'tasks', 'media'].includes(module);
+    const allowed = rolePermissions[currentRole];
+    if (allowed) {
+      return allowed.includes(module);
     }
     return false;
   };
@@ -965,6 +1038,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast,
       dismissToast,
       hasAccess,
+      switchToUser,
+      customRoles,
+      rolePermissions,
+      updateRolePermission,
+      createCustomRole,
+      deleteCustomRole,
       clearAllData
     }}>
       {children}

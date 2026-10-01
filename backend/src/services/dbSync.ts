@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { prisma } from '../config/database';
 import { 
   User as StoreUser, 
@@ -114,10 +116,23 @@ export const mapExpenseCategoryToPrisma = (cat?: string): any => {
 /**
  * Sync entire StoreData into PostgreSQL tables via Prisma.
  */
-export async function syncStoreToPostgres(data: any): Promise<void> {
+export async function syncStoreToPostgres(inputData?: any): Promise<void> {
   console.log('🔄 Starting PostgreSQL database sync...');
 
   try {
+    let data = inputData;
+    if (!data) {
+      const dataFile = path.resolve(__dirname, '../../data/store.json');
+      if (fs.existsSync(dataFile)) {
+        data = JSON.parse(fs.readFileSync(dataFile, 'utf-8'));
+      }
+    }
+
+    if (!data) {
+      console.warn('⚠️ No data available to sync to PostgreSQL.');
+      return;
+    }
+
     // 1. Sync Users
     if (data.users && Array.isArray(data.users)) {
       for (const u of data.users) {
@@ -525,6 +540,10 @@ export async function syncStoreToPostgres(data: any): Promise<void> {
             date: e.date ? new Date(e.date) : new Date(),
             paidBy: e.paidBy || 'Agency',
             paymentMethod: mapPaymentMethodToPrisma(e.paymentMethod),
+            clientId: e.clientId || null,
+            clientName: e.clientName || null,
+            teamMemberId: e.teamMemberId || null,
+            teamMemberName: e.teamMemberName || null,
             receiptName: e.receiptName || null,
             receiptUrl: e.receiptUrl || null,
             notes: e.notes || null
@@ -537,6 +556,10 @@ export async function syncStoreToPostgres(data: any): Promise<void> {
             date: e.date ? new Date(e.date) : new Date(),
             paidBy: e.paidBy || 'Agency',
             paymentMethod: mapPaymentMethodToPrisma(e.paymentMethod),
+            clientId: e.clientId || null,
+            clientName: e.clientName || null,
+            teamMemberId: e.teamMemberId || null,
+            teamMemberName: e.teamMemberName || null,
             receiptName: e.receiptName || null,
             receiptUrl: e.receiptUrl || null,
             notes: e.notes || null

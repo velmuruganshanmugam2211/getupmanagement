@@ -8,7 +8,12 @@ import {
   Check, 
   Moon, 
   Sun, 
-  Save 
+  Save,
+  Plus,
+  Trash2,
+  Sparkles,
+  Shield,
+  CheckSquare
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../components/ui/Button';
@@ -16,10 +21,46 @@ import { Card } from '../../components/ui/Card';
 import { Tabs } from '../../components/ui/Tabs';
 import { Input, Textarea, Select } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
+import { Modal } from '../../components/ui/Modal';
+import { AppModule } from '../../types';
+
+const BASE_ROLES = ['Super Admin', 'Admin', 'Digital Marketer', 'Designer', 'Video Editor'];
+
+const MODULE_DEFINITIONS: { id: AppModule; label: string; description: string }[] = [
+  { id: 'dashboard', label: 'Dashboard & Metrics', description: 'Overview statistics, active counters, and performance charts' },
+  { id: 'clients', label: 'Clients Management', description: 'Client CRM profiles, social media handles, and billing metadata' },
+  { id: 'packages', label: 'Packages & Quotas', description: 'Service tiers, monthly delivery quotas, and add-on pricing' },
+  { id: 'content', label: 'Content Pipeline', description: 'Video & graphic asset production stages and review flow' },
+  { id: 'calendar', label: 'Content Calendar', description: 'Monthly posting schedule and multi-platform planning grid' },
+  { id: 'tasks', label: 'Tasks & Kanban', description: 'Operational task assignments, deadlines, and kanban boards' },
+  { id: 'campaigns', label: 'Performance Campaigns', description: 'Paid ad campaigns on Meta & Google with ROI metrics' },
+  { id: 'finance', label: 'Finance & Invoices', description: 'Client quotations, invoices, payments, and agency expenses' },
+  { id: 'media', label: 'Media Library', description: 'Storage and asset organization for client footage and graphics' },
+  { id: 'team', label: 'Team & Workload', description: 'Employee accounts, role assignments, passwords, and capacity' },
+  { id: 'reports', label: 'Executive Reports', description: 'Monthly client performance digests and revenue analytics' },
+  { id: 'settings', label: 'System Settings', description: 'Agency profile, brand themes, and RBAC matrix permissions' },
+];
 
 export const SettingsPage: React.FC = () => {
-  const { isDark, toggleDarkMode, showToast } = useApp();
+  const { 
+    isDark, 
+    toggleDarkMode, 
+    showToast,
+    customRoles,
+    rolePermissions,
+    updateRolePermission,
+    createCustomRole,
+    deleteCustomRole
+  } = useApp();
   const [activeTab, setActiveTab] = useState('company');
+
+  // Custom Role Modal State
+  const [isAddRoleOpen, setIsAddRoleOpen] = useState(false);
+  const [newRoleName, setNewRoleName] = useState('');
+  const [newRoleModules, setNewRoleModules] = useState<AppModule[]>([
+    'dashboard', 'content', 'tasks', 'media'
+  ]);
+  const [roleError, setRoleError] = useState('');
 
   // Company Profile form state
   const [companyName, setCompanyName] = useState('Getup Digital Solution');
@@ -41,8 +82,60 @@ export const SettingsPage: React.FC = () => {
     showToast('Settings Saved', 'Agency configuration has been updated successfully.');
   };
 
+  const allRoles = [...BASE_ROLES, ...customRoles];
+
+  const handleTogglePermission = (role: string, module: AppModule) => {
+    // Super Admin protection for critical settings
+    if (role === 'Super Admin' && (module === 'settings' || module === 'dashboard')) {
+      showToast('Protected Module', 'Super Admin must retain access to Dashboard and Settings.', 'warning');
+      return;
+    }
+    const currentList = rolePermissions[role] || [];
+    const isAllowed = currentList.includes(module);
+    updateRolePermission(role, module, !isAllowed);
+    showToast('Permission Updated', `${isAllowed ? 'Revoked' : 'Granted'} "${module}" access for ${role}.`);
+  };
+
+  const toggleNewRoleModule = (modId: AppModule) => {
+    setNewRoleModules(prev => 
+      prev.includes(modId) ? prev.filter(m => m !== modId) : [...prev, modId]
+    );
+  };
+
+  const handleSelectAllModules = () => {
+    setNewRoleModules(MODULE_DEFINITIONS.map(m => m.id));
+  };
+
+  const handleDeselectAllModules = () => {
+    setNewRoleModules(['dashboard']);
+  };
+
+  const handleCreateRole = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = newRoleName.trim();
+    if (!trimmed) {
+      setRoleError('Role name is required');
+      return;
+    }
+    if (BASE_ROLES.includes(trimmed) || customRoles.includes(trimmed)) {
+      setRoleError('A role with this name already exists');
+      return;
+    }
+    if (newRoleModules.length === 0) {
+      setRoleError('Please select at least one module permission for this role');
+      return;
+    }
+
+    createCustomRole(trimmed, newRoleModules);
+    showToast('Role Created', `Custom role "${trimmed}" created with ${newRoleModules.length} permissions.`);
+    setIsAddRoleOpen(false);
+    setNewRoleName('');
+    setNewRoleModules(['dashboard', 'content', 'tasks', 'media']);
+    setRoleError('');
+  };
+
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto">
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">
@@ -122,59 +215,208 @@ export const SettingsPage: React.FC = () => {
       {/* Tab 2: Roles & Permissions Matrix */}
       {activeTab === 'roles' && (
         <Card className="p-6 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0] dark:border-[#1E293B]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E2E8F0] dark:border-[#1E293B]">
             <div>
-              <h3 className="text-sm font-bold text-[#0F172A] dark:text-[#F8FAFC]">
-                Role-Based Access Control (RBAC Matrix)
-              </h3>
-              <p className="text-xs text-[#64748B] dark:text-[#94A3B8]">
-                Enforced on navigation, write operations, and data visibility per Section 32.
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-[#0F172A] dark:text-[#F8FAFC]">
+                  Role-Based Access Control (RBAC Matrix)
+                </h3>
+                <Badge variant="brand">Interactive Rules</Badge>
+              </div>
+              <p className="text-xs text-[#64748B] dark:text-[#94A3B8] mt-0.5">
+                Click any cell to grant or revoke real-time permissions for each module. Enforced on sidebar and page access.
               </p>
             </div>
-            <Badge variant="brand">Strict Internal Security</Badge>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setIsAddRoleOpen(true)}
+                leftIcon={<Plus className="w-3.5 h-3.5" />}
+              >
+                Add Custom Role
+              </Button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-[#F8FAFC] dark:bg-[#0B1120] border-b text-[#475569] dark:text-[#94A3B8] font-bold">
                 <tr>
-                  <th className="p-3">Module</th>
-                  <th className="p-3 text-center">Super Admin</th>
-                  <th className="p-3 text-center">Admin</th>
-                  <th className="p-3 text-center">Digital Marketer</th>
-                  <th className="p-3 text-center">Designer</th>
-                  <th className="p-3 text-center">Video Editor</th>
+                  <th className="p-3.5 pl-4">Module</th>
+                  {allRoles.map(role => {
+                    const isCustom = customRoles.includes(role);
+                    return (
+                      <th key={role} className="p-3.5 text-center whitespace-nowrap min-w-[110px]">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span>{role}</span>
+                          {isCustom && (
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Delete custom role "${role}"? Users with this role should be reassigned.`)) {
+                                  deleteCustomRole(role);
+                                  showToast('Role Removed', `Custom role "${role}" was deleted.`);
+                                }
+                              }}
+                              className="text-[#94A3B8] hover:text-[#DC2626] transition-colors p-0.5"
+                              title={`Delete ${role}`}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                        {isCustom && (
+                          <span className="block text-[9px] font-normal text-[#008000] dark:text-[#4ADE80]">Custom Role</span>
+                        )}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0] dark:divide-[#1E293B]">
-                {[
-                  { module: 'Dashboard & Metrics', sa: true, a: true, dm: true, de: true, ve: true },
-                  { module: 'Clients Management', sa: true, a: true, dm: true, de: false, ve: false },
-                  { module: 'Packages & Quotas', sa: true, a: true, dm: false, de: false, ve: false },
-                  { module: 'Content Pipeline', sa: true, a: true, dm: true, de: true, ve: true },
-                  { module: 'Content Calendar', sa: true, a: true, dm: true, de: true, ve: true },
-                  { module: 'Tasks & Kanban', sa: true, a: true, dm: true, de: true, ve: true },
-                  { module: 'Performance Campaigns', sa: true, a: true, dm: true, de: false, ve: false },
-                  { module: 'Finance & Invoices', sa: true, a: true, dm: false, de: false, ve: false },
-                  { module: 'Media Library', sa: true, a: true, dm: true, de: true, ve: true },
-                  { module: 'Team & Workload', sa: true, a: true, dm: false, de: false, ve: false },
-                  { module: 'Executive Reports', sa: true, a: true, dm: true, de: false, ve: false },
-                  { module: 'System Settings', sa: true, a: true, dm: false, de: false, ve: false },
-                ].map((row, i) => (
-                  <tr key={i} className="hover:bg-[#F8FAFC] dark:hover:bg-[#111827]">
-                    <td className="p-3 font-semibold text-[#0F172A] dark:text-[#F8FAFC]">{row.module}</td>
-                    <td className="p-3 text-center">{row.sa ? <Check className="w-4 h-4 text-[#008000] mx-auto" /> : '—'}</td>
-                    <td className="p-3 text-center">{row.a ? <Check className="w-4 h-4 text-[#008000] mx-auto" /> : '—'}</td>
-                    <td className="p-3 text-center">{row.dm ? <Check className="w-4 h-4 text-[#008000] mx-auto" /> : '—'}</td>
-                    <td className="p-3 text-center">{row.de ? <Check className="w-4 h-4 text-[#008000] mx-auto" /> : '—'}</td>
-                    <td className="p-3 text-center">{row.ve ? <Check className="w-4 h-4 text-[#008000] mx-auto" /> : '—'}</td>
+                {MODULE_DEFINITIONS.map(mod => (
+                  <tr key={mod.id} className="hover:bg-[#F8FAFC] dark:hover:bg-[#111827]/70 transition-colors">
+                    <td className="p-3.5 pl-4">
+                      <p className="font-bold text-[#0F172A] dark:text-[#F8FAFC]">{mod.label}</p>
+                      <p className="text-[10px] text-[#64748B] dark:text-[#94A3B8]">{mod.description}</p>
+                    </td>
+                    {allRoles.map(role => {
+                      const permissions = rolePermissions[role] || [];
+                      const isAllowed = permissions.includes(mod.id);
+                      return (
+                        <td key={role} className="p-3.5 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePermission(role, mod.id)}
+                            className={`w-7 h-7 mx-auto rounded-md flex items-center justify-center transition-all ${
+                              isAllowed 
+                                ? 'bg-[#F0FDF4] dark:bg-[#14532D]/40 text-[#008000] border border-[#BBF7D0] dark:border-[#166534] hover:bg-[#DCFCE7]' 
+                                : 'text-[#94A3B8] hover:bg-[#F1F5F9] dark:hover:bg-[#1E293B] border border-transparent'
+                            }`}
+                            title={`Click to ${isAllowed ? 'Revoke' : 'Grant'} ${mod.label} access for ${role}`}
+                          >
+                            {isAllowed ? (
+                              <Check className="w-4 h-4 text-[#008000] stroke-[2.5]" />
+                            ) : (
+                              <span className="text-sm font-bold text-[#94A3B8]">—</span>
+                            )}
+                          </button>
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+
+          <div className="pt-2 flex items-center justify-between text-xs text-[#64748B] dark:text-[#94A3B8] border-t border-[#E2E8F0] dark:border-[#1E293B]">
+            <span>Tip: Click any <strong className="text-[#008000]">✓</strong> or <strong className="text-[#94A3B8]">—</strong> icon in the table above to toggle role access instantly.</span>
+            <span className="font-medium text-[#008000]">{allRoles.length} Active Agency Roles</span>
+          </div>
         </Card>
       )}
+
+      {/* Add Custom Role Modal */}
+      <Modal
+        isOpen={isAddRoleOpen}
+        onClose={() => {
+          setIsAddRoleOpen(false);
+          setRoleError('');
+        }}
+        title="Add Custom Agency Role"
+        description="Define a new role and choose exactly which modules it has access to using the checkboxes below."
+        maxWidth="lg"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setIsAddRoleOpen(false);
+                setRoleError('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleCreateRole}
+              leftIcon={<Plus className="w-3.5 h-3.5" />}
+            >
+              Create Role
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleCreateRole} className="space-y-4">
+          <Input
+            label="Role Title / Designation"
+            placeholder="e.g. Lead Video Editor, Content Strategist, Shoot Director"
+            value={newRoleName}
+            onChange={e => {
+              setNewRoleName(e.target.value);
+              setRoleError('');
+            }}
+            required
+            error={roleError}
+          />
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-[#0F172A] dark:text-[#E2E8F0]">
+                Module Permissions & Rules (Checkboxes)
+              </label>
+              <div className="flex items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={handleSelectAllModules}
+                  className="text-[#008000] hover:underline font-semibold"
+                >
+                  Select All
+                </button>
+                <span className="text-[#CBD5E1]">|</span>
+                <button
+                  type="button"
+                  onClick={handleDeselectAllModules}
+                  className="text-[#64748B] hover:underline"
+                >
+                  Clear All
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[300px] overflow-y-auto p-1 border border-[#E2E8F0] dark:border-[#1E293B] rounded-xl">
+              {MODULE_DEFINITIONS.map(mod => {
+                const isChecked = newRoleModules.includes(mod.id);
+                return (
+                  <label
+                    key={mod.id}
+                    onClick={() => toggleNewRoleModule(mod.id)}
+                    className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                      isChecked
+                        ? 'border-[#008000] bg-[#F0FDF4] dark:bg-[#14532D]/20 text-[#0F172A] dark:text-white'
+                        : 'border-[#E2E8F0] dark:border-[#334155] bg-white dark:bg-[#1E293B]/40 hover:bg-[#F8FAFC]'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => {}} // handled by parent label click
+                      className="mt-0.5 w-4 h-4 rounded text-[#008000] focus:ring-[#008000] accent-[#008000]"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-[#0F172A] dark:text-[#F8FAFC] truncate">{mod.label}</p>
+                      <p className="text-[10px] text-[#64748B] dark:text-[#94A3B8] leading-tight line-clamp-1">{mod.description}</p>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </form>
+      </Modal>
 
       {/* Tab 3: Appearance & Theme */}
       {activeTab === 'appearance' && (
