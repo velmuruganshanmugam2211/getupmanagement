@@ -18,9 +18,15 @@ app.use(cors({
     // Allow requests with no origin (e.g. mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
 
+    let isVercelDomain = false;
+    try {
+      isVercelDomain = /\.vercel\.app$/.test(new URL(origin).hostname);
+    } catch {}
+
     if (
       origin === env.FRONTEND_URL ||
-      /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+      /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
+      isVercelDomain
     ) {
       return callback(null, true);
     }
@@ -41,7 +47,7 @@ if (env.NODE_ENV !== 'test') {
 }
 
 // Health check
-app.get('/health', (_req, res) => {
+app.get(['/health', '/api/health'], (_req, res) => {
   res.json({ status: 'ok', service: 'GETUP OS Agency Backend', timestamp: new Date().toISOString() });
 });
 

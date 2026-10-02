@@ -20,3 +20,6 @@ const shutdown = () => {
 
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
+
+export { app };
+export default app;
